@@ -1,0 +1,31 @@
+OpenCL platform:
+
+Name: Clover
+Vendor: Mesa
+Version: OpenCL 1.1 Mesa 22.1.0
+Profile: FULL_PROFILE
+
+Device:
+
+Name: AMD Radeon RX 480 Graphics (polaris10, LLVM 13.0.1, DRM 3.44, 5.17.9-arch1-1)
+Vendor: AMD
+Driver version: 22.1.0
+Local memory size: 32768 Byte
+
+******************************
+
+Testing TemplateMatching
+Build log:
+
+  cellimg...0.264834ms
+  prepare...750.218ms
+  Integral OCV ...3.25976ms
+  Integral OCV GPU ...0.748338ms 0.7676ms (c1) 2.36501ms (c2)3.92799ms (inital kernel)
+  Integral GPU ...4.69026ms
+ocv gpu-cpu: 0
+gpu-ocv(cpu): 0
+output/integral_ocv.png(0-8.058e+06)
+output/integral_ocv_gpu.png(0-8.058e+06)
+output/integral_gpu.png(0-8.058e+06)
+output/integral_diff_ocv.png(0-0)
+output/integral_diff_gpu_ocv.png(0-0)

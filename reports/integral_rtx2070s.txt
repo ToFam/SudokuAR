@@ -1,0 +1,31 @@
+OpenCL platform:
+
+Name: NVIDIA CUDA
+Vendor: NVIDIA Corporation
+Version: OpenCL 3.0 CUDA 11.6.127
+Profile: FULL_PROFILE
+
+Device:
+
+Name: NVIDIA GeForce RTX 2070 SUPER
+Vendor: NVIDIA Corporation
+Driver version: 510.60.02
+Local memory size: 49152 Byte
+
+******************************
+
+Testing TemplateMatching
+Build log:
+
+  cellimg...0.06653ms
+  prepare...150.43ms
+  Integral OCV ...0.841561ms
+  Integral OCV GPU ...0.209088ms 37.6192ms (c1) 0.402751ms (c2)3.49084ms (inital kernel)
+  Integral GPU ...2.17131ms
+ocv gpu-cpu: 0
+gpu-ocv(cpu): 0
+output/integral_ocv.png(0-8.058e+06)
+output/integral_ocv_gpu.png(0-8.058e+06)
+output/integral_gpu.png(0-8.058e+06)
+output/integral_diff_ocv.png(0-0)
+output/integral_diff_gpu_ocv.png(0-0)
