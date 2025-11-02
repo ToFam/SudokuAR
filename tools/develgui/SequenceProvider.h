@@ -5,9 +5,16 @@
 
 #include <opencv2/opencv.hpp>
 
+#include <memory>
+
+class PylonDriver;
+
 class SequenceProvider
 {
 public:
+    SequenceProvider();
+    ~SequenceProvider();
+
     bool loadFiles(QStringList files);
     bool loadVideoSource(QString path);
 
@@ -42,4 +49,5 @@ private:
     QStringList m_files;
     QString m_vidSource;
     cv::VideoCapture m_vc;
+    std::unique_ptr<PylonDriver> m_pylon;
 };

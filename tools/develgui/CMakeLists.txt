@@ -1,10 +1,14 @@
 find_package (Qt5 REQUIRED Core Gui Widgets)
 
+find_package (pylon 8.0.1 REQUIRED)
+
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
 SET (DevelSrc
+    AlgoFactory.h
+    AlgoFactory.cpp
     main.cpp
     DevelGUIWindow.h
     DevelGUIWindow.cpp
@@ -20,6 +24,8 @@ SET (DevelSrc
     ContainerDisplay.h
     ContainerDisplay.cpp
     res.qrc
+    PylonDriver.h
+    PylonDriver.cpp
     
     gui-algo/HoughLinesDisplay.h
     gui-algo/HoughLinesDisplay.cpp
@@ -32,8 +38,7 @@ SET (DevelSrc
 SET (DevelTarget sudokuar-develgui)
 
 add_executable(${DevelTarget}
-            ${DevelSrc}
-            AlgoFactory.h AlgoFactory.cpp
+               ${DevelSrc}
 )
 
 target_include_directories(${DevelTarget} PRIVATE ../guicommon ../../algo)
@@ -45,4 +50,5 @@ target_link_libraries(${DevelTarget}
 	Qt5::Gui
 	Qt5::Core
         opencv_core opencv_video opencv_videoio
+        pylon::pylon
 )

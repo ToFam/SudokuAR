@@ -39,18 +39,15 @@ DevelGUIWindow::DevelGUIWindow(QWidget *parent) :
     connect(ui->tbPlayPause, &QToolButton::pressed, this, [&](){
         if (m_timer.isActive())
         {
-            m_timer.stop();
-            ui->tbPlayPause->setIcon(QIcon(":/icons/res/play.svg"));
+            stopPlayback();
         }
         else
         {
-            m_timer.start();
-            ui->tbPlayPause->setIcon(QIcon(":/icons/res/pause.svg"));
+            startPlayback();
         }
     });
     connect(ui->tbStop, &QToolButton::pressed, this, [&](){
-        m_timer.stop();
-        ui->tbPlayPause->setIcon(QIcon(":/icons/res/play.svg"));
+        stopPlayback();
 
         if (m_sp.set(0))
         {
@@ -186,6 +183,7 @@ void DevelGUIWindow::processImage()
             QMessageBox::critical(this, tr("Alogrithm Error"), tr("Error during exection of Algorithm '%1':\n%2")
                                                                .arg(QString::fromStdString(m_algoStack[i]->algo()->name()),
                                                                     QString::fromStdString(e.what())));
+            stopPlayback();
             break;
         }
     }
@@ -628,4 +626,22 @@ void DevelGUIWindow::onLoad()
     }
 
     next(false);
+}
+
+void DevelGUIWindow::startPlayback()
+{
+    if (!m_timer.isActive())
+    {
+        m_timer.start();
+        ui->tbPlayPause->setIcon(QIcon(":/icons/res/pause.svg"));
+    }
+}
+
+void DevelGUIWindow::stopPlayback()
+{
+    if (m_timer.isActive())
+    {
+        m_timer.stop();
+        ui->tbPlayPause->setIcon(QIcon(":/icons/res/play.svg"));
+    }
 }

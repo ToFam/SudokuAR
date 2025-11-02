@@ -1,4 +1,5 @@
 #include "SequenceProvider.h"
+#include "PylonDriver.h"
 
 #include <QFileInfo>
 #include <thread>
@@ -30,6 +31,22 @@ bool SequenceProvider::loadVideoSource(QString path)
     m_videoMode = true;
     m_vidSource = path;
     m_frameNumber = -1;
+
+    if (path == "pylon")
+    {
+        try
+        {
+            m_pylon = std::make_unique<PylonDriver>();
+            m_validInput = true;
+            return true;
+        }
+        catch(...)
+        {
+            m_validInput = false;
+            return false;
+        }
+    }
+
     if (!m_vc.open(path.toInt()))//path.toStdString()))
     {
         std::cout << "Open Video Capture " << path.toStdString() << " failed" << std::endl;
@@ -88,6 +105,12 @@ bool SequenceProvider::next()
 
     if (m_videoMode)
     {
+        if (m_pylon)
+        {
+            m_frame = m_pylon->grab();
+            return !m_frame.empty();
+        }
+
         if (!m_vc.read(m_frame))
         {
             if (m_repeat && m_vc.open(m_vidSource.toInt())) //m_vidSource.toStdString()))
@@ -158,6 +181,11 @@ bool SequenceProvider::set(int frameNumber)
 
     if (m_videoMode)
     {
+        if (m_pylon)
+        {
+            return false;
+        }
+
         if (frameNumber == 0)
         {
             std::cout << "Close Video Capture " << m_vidSource.toStdString() << std::endl;
@@ -221,3 +249,6 @@ QStringList SequenceProvider::imageFiles() const
 {
     return m_files;
 }
+
+SequenceProvider::SequenceProvider() = default;
+SequenceProvider::~SequenceProvider() = default;

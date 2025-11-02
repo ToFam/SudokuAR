@@ -17,6 +17,5 @@ private:
                       cv::Mat& outImg);
 
 private:
-    cv::Mat m_image;
     std::vector<cv::Point2f> m_intersectPoints;
 };

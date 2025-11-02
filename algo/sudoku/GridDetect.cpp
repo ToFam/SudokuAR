@@ -13,7 +13,6 @@ GridDetect::GridDetect() : Algorithm("GridDetect")
     ContainerSpecification in_seglines("in_linegroups", ContainerSpecification::REFERENCE);
 
     ContainerSpecification out_frames("out_frames", ContainerSpecification::REFERENCE);
-    ContainerSpecification out_framesImage("out_framesImage", ContainerSpecification::REFERENCE);
 
     m_argumentsSpecification.push_back(in_image);
     m_argumentsSpecification.push_back(in_lines);
@@ -130,7 +129,6 @@ bool GridDetect::exec()
     int width = in_image->cols;
     int height = in_image->rows;
 
-
     cv::Mat& lineMat = *in_lines;
 
     int channels = lineMat.channels();
@@ -141,9 +139,7 @@ bool GridDetect::exec()
     }
 
     std::vector<cv::Vec2i> lineGroups(*in_seglines);
-
     std::vector<cv::Vec4i> lines(*in_lines);
-
 
     std::set<size_t> groupReps;
     for (size_t g = 0; g < lineGroups.size(); ++g)
@@ -155,7 +151,6 @@ bool GridDetect::exec()
 
     // Find Frames
     // ===========================
-
     std::vector<std::vector<cv::Point2f>> frames;
 
     {
@@ -164,10 +159,6 @@ bool GridDetect::exec()
         // Find two most common ones
         //  (if no clear distinction, drop group)
         // Find outermost lines with these angles and create bounding rect
-        // maybe check intersection points in rect for further confirmation
-        // fit 9x9 grid onto intersection points to cut off stuff like a header or double frame
-
-
         for (size_t groupNumber : groupReps)
         {
             cv::Mat angleHistogram = cv::Mat::zeros(1, 360, CV_8U);

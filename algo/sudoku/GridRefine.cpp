@@ -8,8 +8,6 @@
 GridRefine::GridRefine() : Algorithm("GridRefine")
 {
     ContainerSpecification in_image("in_binary", ContainerSpecification::READ_ONLY);
-    ContainerSpecification in_lines("in_lines", ContainerSpecification::READ_ONLY);
-    ContainerSpecification in_seglines("in_linegroups", ContainerSpecification::READ_ONLY);
     ContainerSpecification in_points("in_points", ContainerSpecification::READ_ONLY);
     ContainerSpecification in_frames("in_frames", ContainerSpecification::READ_ONLY);
 
@@ -19,8 +17,6 @@ GridRefine::GridRefine() : Algorithm("GridRefine")
     ContainerSpecification out_framePoints("out_framePoints", ContainerSpecification::REFERENCE);
 
     m_argumentsSpecification.push_back(in_image);
-    m_argumentsSpecification.push_back(in_lines);
-    m_argumentsSpecification.push_back(in_seglines);
     m_argumentsSpecification.push_back(in_points);
     m_argumentsSpecification.push_back(in_frames);
     m_argumentsSpecification.push_back(out_frames);
@@ -204,15 +200,13 @@ bool GridRefine::processFrame(std::vector<cv::Point2f> &frame, std::vector<cv::P
 bool GridRefine::exec()
 {
     std::shared_ptr<cv::Mat> in_image = m_arguments[0]->get();
-    std::shared_ptr<cv::Mat> in_lines = m_arguments[1]->get();
-    std::shared_ptr<cv::Mat> in_seglines = m_arguments[2]->get();
-    std::shared_ptr<cv::Mat> in_points = m_arguments[3]->get();
-    std::shared_ptr<cv::Mat> in_frames = m_arguments[4]->get();
-    std::shared_ptr<cv::Mat> out_frames = m_arguments[5]->get();
+    std::shared_ptr<cv::Mat> in_points = m_arguments[1]->get();
+    std::shared_ptr<cv::Mat> in_frames = m_arguments[2]->get();
+    std::shared_ptr<cv::Mat> out_frames = m_arguments[3]->get();
 
-    std::shared_ptr<Container>& out_frameImages = m_arguments[6];
+    std::shared_ptr<Container>& out_frameImages = m_arguments[4];
 
-    std::shared_ptr<Container>& out_framePoints = m_arguments[7];
+    std::shared_ptr<Container>& out_framePoints = m_arguments[5];
 
     if (in_frames->empty())
         return true;
@@ -221,7 +215,6 @@ bool GridRefine::exec()
     int pointDistAvgWindow = m_settings.get("pointdist_avg_window").valueInt().value();
     float templateDiscardFactor = m_settings.get("discardFactor").valueFloat().value();
 
-    m_image = *in_image;
     m_intersectPoints = std::vector<cv::Point2f>(*in_points);
 
     size_t frameNum = in_frames->rows;

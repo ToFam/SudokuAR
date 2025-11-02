@@ -43,7 +43,7 @@ bool Resize::exec()
 
     cv::Size newSize(static_cast<int>(s * inWidth), static_cast<int>(s * inHeight));
 
-    std::cout << newSize.width << " x " << newSize.height << std::endl;
+    //std::cout << newSize.width << " x " << newSize.height << std::endl;
 
     cv::resize(*input, *output, newSize);
 

@@ -74,6 +74,9 @@ private:
 
     void onLoad();
 
+    void startPlayback();
+    void stopPlayback();
+
 private:
     Ui::DevelGUIWindow *ui;
 
