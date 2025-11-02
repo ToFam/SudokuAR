@@ -157,10 +157,15 @@ void GUIAlgoElement::prepare(std::map<std::string, std::shared_ptr<Container> > 
     {
         QComboBox* box = static_cast<QComboBox*>(m_argumentWidgets[spec.name()]);
 
-        auto it = containerStack.find(box->currentText().toStdString());
+        auto name = box->currentText().toStdString();
+        auto it = containerStack.find(name);
         if (it != containerStack.end())
         {
             m_algo->addContainer(it->second);
+        }
+        else
+        {
+            throw std::runtime_error(std::format("Container '{}' not found", name));
         }
     }
 
@@ -170,25 +175,25 @@ void GUIAlgoElement::prepare(std::map<std::string, std::shared_ptr<Container> > 
         {
         case Option::INT:
         {
-            QSpinBox* b = static_cast<QSpinBox*>(m_optionWidgets[opt->name()]);
+            QSpinBox* b = static_cast<QSpinBox*>(m_optionWidgets.at(opt->name()));
             opt->setIntValue(b->value());
             break;
         }
         case Option::BOOL:
         {
-            QCheckBox* b = static_cast<QCheckBox*>(m_optionWidgets[opt->name()]);
+            QCheckBox* b = static_cast<QCheckBox*>(m_optionWidgets.at(opt->name()));
             opt->setBoolValue(b->isChecked());
             break;
         }
         case Option::FLOAT:
         {
-            QDoubleSpinBox* b = static_cast<QDoubleSpinBox*>(m_optionWidgets[opt->name()]);
+            QDoubleSpinBox* b = static_cast<QDoubleSpinBox*>(m_optionWidgets.at(opt->name()));
             opt->setFloatValue(b->value());
             break;
         }
         case Option::DOUBLE:
         {
-            QDoubleSpinBox* b = static_cast<QDoubleSpinBox*>(m_optionWidgets[opt->name()]);
+            QDoubleSpinBox* b = static_cast<QDoubleSpinBox*>(m_optionWidgets.at(opt->name()));
             opt->setDoubleValue(b->value());
             break;
         }

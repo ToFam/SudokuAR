@@ -170,7 +170,18 @@ void DevelGUIWindow::processImage()
 
     for (size_t i = 0; i < m_algoStack.size(); i++)
     {
-        m_algoStack[i]->prepare(m_containerStack);
+        try
+        {
+            m_algoStack[i]->prepare(m_containerStack);
+        }
+        catch(std::exception& e)
+        {
+            QMessageBox::critical(this, tr("Pipeline Error"), tr("Error during preparation of Algorithm '%1':\n%2")
+                                      .arg(QString::fromStdString(m_algoStack[i]->algo()->name()),
+                                           QString::fromStdString(e.what())));
+            stopPlayback();
+            break;
+        }
 
         try
         {
@@ -384,8 +395,11 @@ void DevelGUIWindow::next()
 
 void DevelGUIWindow::next(bool process)
 {
+    Timer framegrabTimer;
     if (m_sp.next())
     {
+        ui->lFramegrabRuntime->setText(QString("%1 ms").arg(framegrabTimer.elapsed()));
+
         QSignalBlocker b(ui->sbFrame), b3(ui->hsFrame);
         ui->sbFrame->setValue(m_sp.frameNumber());
         ui->hsFrame->setValue(m_sp.frameNumber());
