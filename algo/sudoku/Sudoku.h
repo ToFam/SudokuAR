@@ -49,5 +49,5 @@ private:
     cl_program m_Program;
     cl_kernel  m_SolverKernel;
 
-    int m_logLevel = 0;
+    int m_logLevel;
 };

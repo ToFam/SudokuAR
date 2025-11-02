@@ -4,6 +4,8 @@
 #include <assert.h>
 #include <iostream>
 #include <vector>
+#include <numeric>
+
 #include <opencv2/opencv.hpp>
 
 #include <CLUtil.h>
@@ -24,17 +26,21 @@ public:
      */
     int value() const;
 
-    void setValue(int value);
+    bool valid() const { return m_value > -1; }
+    bool solved() const { return m_value > 0; }
 
-    void set(int value);
-
+    /**
+     * @brief setValue set cell to \a value if possible
+     * @return false if \a value is not in list of possiblities
+     */
+    bool setValue(int value);
     void disable(int value);
-    //void setPossibilities(bool* possibilities);
+
     const std::vector<bool>& possibilities() const;
 
     /**
      * @brief solve write value if only one possibility left
-     * @return true if value was set, false if more than one possibility remains
+     * @return true if value was set or marked as invalid, false if more than one possibility remains
      */
     bool solve();
 
@@ -49,20 +55,25 @@ class Field
 public:
     Field(size_t N);
 
-    void setValue(size_t row, size_t col, int value);
+    /**
+     * @brief setValue set cell with coords (\a col, \a row) to \a value if possible
+     * @returns false if \a value is not in list of possiblities for cell
+     */
+    bool setValue(size_t row, size_t col, int value);
     int value(size_t row, size_t col) const;
     const std::vector<bool>& possibilities(size_t row, size_t col) const;
 
     /**
      * @brief solveStep solve cells with only one possibility left
-     * @return count of solved cells in this step
+     * @return if field can still be valid and number of changes in this step
      */
-    int solveStep();
+    std::tuple<bool, int> solveStep();
 
     void print(int recursionDepth) const;
 
     bool valid() const;
     bool solved() const;
+    size_t numSolvedCells() const;
 
     std::vector<Cell>& cells() { return m_cells; }
 
@@ -73,7 +84,7 @@ private:
 
 
 Sudoku::Sudoku(size_t N) : Algorithm("Sudoku"), m_N(N),
-    m_dArray(nullptr), m_Program(nullptr), m_SolverKernel(nullptr)
+    m_dArray(nullptr), m_Program(nullptr), m_SolverKernel(nullptr), m_logLevel(1)
 {
     ContainerSpecification input("in_grid", ContainerSpecification::READ_ONLY);
     ContainerSpecification output("out_grid", ContainerSpecification::REFERENCE);
@@ -112,6 +123,8 @@ bool Sudoku::exec()
         m_activeImpl = CPU;
     }
 
+    std::cout << "Start solver" << std::endl;
+
     std::vector<double> runtimes;
 
     auto input = m_arguments[0];
@@ -120,11 +133,15 @@ bool Sudoku::exec()
         auto sudoku = input->get(s);
 
         if (sudoku->empty())
+        {
             continue;
+        }
 
         m_hArray = std::vector<int>(*sudoku);
         if (m_hArray.size() != m_N * m_N)
-            return false;
+        {
+            throw std::runtime_error("Invalid input size");
+        }
 
         Timer timer;
 
@@ -134,7 +151,6 @@ bool Sudoku::exec()
         }
 
         runtimes.push_back(timer.elapsed() / double(m_iterations));
-
 
         auto output = std::make_shared<cv::Mat>();
         if (m_activeImpl == ImplementationType::CPU)
@@ -150,7 +166,12 @@ bool Sudoku::exec()
     {
         m_runtime += r;
     }
-    m_runtime /= runtimes.size();
+    if (!runtimes.empty())
+    {
+        m_runtime /= runtimes.size();
+    }
+
+    std::cout << "solver finished" << std::endl;
 
     return true;
 }
@@ -200,6 +221,7 @@ bool Sudoku::ValidateResults()
 void Sudoku::DoCompute()
 {
     Field f(m_N), fResult(m_N);
+    bool valid = false;
     for (size_t row = 0; row < m_N; ++row)
     {
         for (size_t col = 0; col < m_N; ++col)
@@ -207,16 +229,23 @@ void Sudoku::DoCompute()
             int val = m_hArray[row * m_N + col];
             if (val > 0)
             {
-                f.setValue(row, col, val);
-            }
-            else
-            {
-                f.cells()[row * m_N + col].set(0);
+                valid |= f.setValue(row, col, val);
             }
         }
     }
 
+    if (!valid)
+    {
+        std::cout << "Invalid input" << std::endl;
+        f.print(0);
+        return;
+    }
 
+    if (f.numSolvedCells() < 16)
+    {
+        std::cout << "Skip grid with too few values (" << f.numSolvedCells() << ")" << std::endl;
+        return;
+    }
 
     if (m_logLevel > 0)
         f.print(0);
@@ -224,6 +253,11 @@ void Sudoku::DoCompute()
     if (!solveStep(f, 0, fResult))
     {
         std::cout << "Could not solve" << std::endl;
+        return;
+    }
+    else
+    {
+        std::cout << "Solved" << std::endl;
     }
 
     if (m_logLevel > 0)
@@ -250,12 +284,14 @@ bool Sudoku::solveStep(Field& f, int recursionDepth, Field& outResult)
 {
     if (m_activeImpl == ImplementationType::CPU)
     {
-        int singleStepSolved, acc = 0;
+        bool valid = true;
+        int singleStepSolved, acc = 0, steps = 0;
         do
         {
-            singleStepSolved = f.solveStep();
+            std::tie(valid, singleStepSolved) = f.solveStep();
             acc += singleStepSolved;
-        } while (singleStepSolved > 0);
+            ++steps;
+        } while (valid && singleStepSolved > 0);
 
         if (m_logLevel > 0)
         {
@@ -264,7 +300,7 @@ bool Sudoku::solveStep(Field& f, int recursionDepth, Field& outResult)
                 std::cout << " | ";
             }
 
-            std::cout << "single step solve: " << acc << std::endl;
+            std::cout << steps << " forced step(s) solved " << acc << " cells" << std::endl;
         }
 
         if (m_logLevel > 1)
@@ -276,7 +312,7 @@ bool Sudoku::solveStep(Field& f, int recursionDepth, Field& outResult)
             return true;
         }
 
-        if (!f.valid())
+        if (!valid)
             return false;
 
         size_t row, col; int val;
@@ -399,7 +435,7 @@ bool Sudoku::solveTrial(Field &f, size_t &outRow, size_t &outCol, int &outValue,
         {
             const std::vector<bool>& ps = f.possibilities(outRow, outCol);
 
-            for (int p = 0; p < m_N; p++)
+            for (size_t p = 0; p < m_N; p++)
             {
                 if (ps[p] == true)
                 {
@@ -438,7 +474,7 @@ bool Sudoku::solveTrial(Field &f, size_t &outRow, size_t &outCol, int &outValue,
 
 Cell::Cell(size_t N) : m_N(N)
 {
-    m_value = -1;
+    m_value = 0;
     m_possible = std::vector<bool>(m_N, true);
 }
 
@@ -452,17 +488,18 @@ const std::vector<bool> &Cell::possibilities() const
     return m_possible;
 }
 
-void Cell::setValue(int value)
+bool Cell::setValue(int value)
 {
-    for (int i = 0; i < m_N; i++)
+    if (!m_possible[value - 1])
+    {
+        return false;
+    }
+
+    for (size_t i = 0; i < m_N; i++)
         m_possible[i] = false;
     m_possible[value - 1] = true;
     m_value = value;
-}
-
-void Cell::set(int value)
-{
-    m_value = value;
+    return true;
 }
 
 int Cell::value() const
@@ -474,7 +511,7 @@ bool Cell::solve()
 {
     int maybeSolution = -1;
     bool invalid = true;
-    for (int i = 0; i < m_N; i++)
+    for (size_t i = 0; i < m_N; i++)
     {
         if (m_possible[i] == true)
         {
@@ -496,19 +533,20 @@ bool Cell::solve()
     {
         // no possible solutions left
         m_value = -1;
+        return true;
     }
     else if (maybeSolution == -1)
     {
         // undecided
         m_value = 0;
+        return false;
     }
     else
     {
         // only value possible
         m_value = maybeSolution + 1;
+        return true;
     }
-
-    return m_value > 0;
 }
 
 Field::Field(size_t N) : m_N(N)
@@ -517,9 +555,14 @@ Field::Field(size_t N) : m_N(N)
         m_cells.emplace_back(m_N);
 }
 
-void Field::setValue(size_t row, size_t col, int value)
+bool Field::setValue(size_t row, size_t col, int value)
 {
     assert(row >= 0 && row < m_N && col >= 0 && col < m_N);
+    bool valid = m_cells[m_N * row + col].setValue(value);
+    if (!valid)
+    {
+        return false;
+    }
 
     for (size_t i = 0; i < m_N; i++)
         m_cells[m_N * row + i].disable(value);
@@ -536,7 +579,7 @@ void Field::setValue(size_t row, size_t col, int value)
         }
     }
 
-    m_cells[m_N * row + col].setValue(value);
+    return true;
 }
 
 int Field::value(size_t row, size_t col) const
@@ -553,52 +596,44 @@ const std::vector<bool>& Field::possibilities(size_t row, size_t col) const
     return m_cells[m_N * row + col].possibilities();
 }
 
-int Field::solveStep()
+std::tuple<bool, int> Field::solveStep()
 {
-    struct change{
-        size_t row; size_t col; int value;
-    };
-    std::vector<change> changes;
-
+    int changes = 0;
     for (size_t i = 0; i < m_N * m_N; i++)
     {
-        if (m_cells[i].value() > 0)
+        Cell& cell = m_cells[i];
+        if (cell.solved())
             continue;
 
-        if (m_cells[i].solve())
+        if (cell.solve())
         {
-            changes.push_back({i / m_N, i % m_N, m_cells[i].value()});
+            ++changes;
+            if (!cell.valid())
+            {
+                return {false, changes};
+            }
+
+            setValue(i / m_N, i % m_N, cell.value());
         }
     }
 
-    for (change c : changes)
-    {
-        if (m_cells[m_N * c.row + c.col].solve())
-            setValue(c.row, c.col, c.value);
-    }
-
-    return changes.size();
+    return {true, changes};
 }
 
 bool Field::solved() const
 {
-    bool missing = false;
-    for (size_t i = 0; i < m_N * m_N; i++)
-    {
-        if (m_cells[i].value() < 1)
-            missing = true;
-    }
-    return !missing;
+    return std::ranges::all_of(m_cells, [](const Cell& cell){ return cell.solved(); });
 }
 
 bool Field::valid() const
 {
-    for (size_t i = 0; i < m_N * m_N; i++)
-    {
-        if (m_cells[i].value() < 0)
-            return false;
-    }
-    return true;
+    return std::ranges::all_of(m_cells, [](const Cell& cell) { return cell.valid(); });
+}
+
+size_t Field::numSolvedCells() const
+{
+    return std::accumulate(m_cells.begin(), m_cells.end(),
+                           0, [](size_t filled, const Cell& cell){ return filled + (cell.solved() ? 1 : 0); });
 }
 
 void Field::print(int recursionDepth) const
