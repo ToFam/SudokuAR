@@ -55,10 +55,10 @@ bool TestSolver::DoCompute()
     cout<<"Running Sudoku Solver..."<<endl<<endl;
     {
         std::shared_ptr<cv::Mat> in(new cv::Mat()), out(new cv::Mat());
-        if (openInputData("eval/solver/SudokuSolver_9.yml", "field", *in))
+        if (openInputData("eval/solver/SudokuSolver_9_1.yml", "field", *in))
         {
             Sudoku s(9);
-            s.setLogLevel(50);
+            s.setLogLevel(6);
             m_context.initTask(s);
 
             auto ci(std::make_shared<Container>()), co(std::make_shared<Container>());

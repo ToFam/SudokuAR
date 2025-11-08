@@ -36,7 +36,7 @@ public:
     bool setValue(int value);
     void disable(int value);
 
-    const std::vector<bool>& possibilities() const;
+    bool possible(int value) const;
 
     /**
      * @brief solve write value if only one possibility left
@@ -60,8 +60,8 @@ public:
      * @returns false if \a value is not in list of possiblities for cell
      */
     bool setValue(size_t row, size_t col, int value);
+    bool possible(size_t row, size_t col, int value) const;
     int value(size_t row, size_t col) const;
-    const std::vector<bool>& possibilities(size_t row, size_t col) const;
 
     /**
      * @brief solveStep solve cells with only one possibility left
@@ -75,11 +75,16 @@ public:
     bool solved() const;
     size_t numSolvedCells() const;
 
-    std::vector<Cell>& cells() { return m_cells; }
+private:
+    Cell& cell(size_t row, size_t col) const;
 
 private:
     size_t m_N;
     std::vector<Cell> m_cells;
+
+    std::vector<std::vector<int>> m_rows;
+    std::vector<std::vector<int>> m_cols;
+    std::vector<std::vector<int>> m_blocks;
 };
 
 
@@ -241,7 +246,7 @@ void Sudoku::DoCompute()
         return;
     }
 
-    if (f.numSolvedCells() < 16)
+    if (f.numSolvedCells() < 17)
     {
         std::cout << "Skip grid with too few values (" << f.numSolvedCells() << ")" << std::endl;
         return;
@@ -433,13 +438,11 @@ bool Sudoku::solveTrial(Field &f, size_t &outRow, size_t &outCol, int &outValue,
         outCol = i % 9;
         if (f.value(outRow, outCol) == 0)
         {
-            const std::vector<bool>& ps = f.possibilities(outRow, outCol);
-
-            for (size_t p = 0; p < m_N; p++)
+            for (size_t p = 1; p <= m_N; ++p)
             {
-                if (ps[p] == true)
+                if (f.possible(outRow, outCol, p) == true)
                 {
-                    outValue = p + 1;
+                    outValue = p;
 
                     if (m_logLevel > -1)
                     {
@@ -483,9 +486,16 @@ void Cell::disable(int value)
     m_possible[value - 1] = false;
 }
 
-const std::vector<bool> &Cell::possibilities() const
+bool Cell::possible(int value) const
 {
-    return m_possible;
+    assert(value > 0 && value <= m_N);
+
+    if (!valid())
+    {
+        return false;
+    }
+
+    return m_possible[value - 1];
 }
 
 bool Cell::setValue(int value)
@@ -497,7 +507,6 @@ bool Cell::setValue(int value)
 
     for (size_t i = 0; i < m_N; i++)
         m_possible[i] = false;
-    m_possible[value - 1] = true;
     m_value = value;
     return true;
 }
@@ -549,10 +558,26 @@ bool Cell::solve()
     }
 }
 
-Field::Field(size_t N) : m_N(N)
+Field::Field(size_t N) : m_N(N), m_rows(m_N), m_cols(m_N), m_blocks(m_N)
 {
     for (size_t i = 0; i < m_N * m_N; ++i)
+    {
         m_cells.emplace_back(m_N);
+    }
+
+    for (size_t i = 0; i < m_N; ++i)
+    {
+        for (size_t j = 0; j < m_N; ++j)
+        {
+            m_rows[i].push_back(m_N * i + j);
+            m_cols[i].push_back(m_N * j + i);
+        }
+    }
+
+    for (size_t block = 0; block < m_N; ++block)
+    {
+        // todo
+    }
 }
 
 bool Field::setValue(size_t row, size_t col, int value)
@@ -582,18 +607,21 @@ bool Field::setValue(size_t row, size_t col, int value)
     return true;
 }
 
-int Field::value(size_t row, size_t col) const
+Cell& Field::cell(size_t row, size_t col) const
 {
     assert(row >= 0 && row < m_N && col >= 0 && col < m_N);
 
-    return m_cells[m_N * row + col].value();
+    return const_cast<Cell&>(m_cells[m_N * row + col]);
 }
 
-const std::vector<bool>& Field::possibilities(size_t row, size_t col) const
+int Field::value(size_t row, size_t col) const
 {
-    assert(row >= 0 && row < m_N && col >= 0 && col < m_N);
+    return cell(row, col).value();
+}
 
-    return m_cells[m_N * row + col].possibilities();
+bool Field::possible(size_t row, size_t col, int value) const
+{
+    return cell(row, col).possible(value);
 }
 
 std::tuple<bool, int> Field::solveStep()
@@ -614,6 +642,41 @@ std::tuple<bool, int> Field::solveStep()
             }
 
             setValue(i / m_N, i % m_N, cell.value());
+        }
+    }
+
+    auto solveBlock = [&](int value, auto&& block)
+    {
+        size_t numCellsWherePossible = 0;
+        int indexPossible = 0;
+        for (const auto& i : block)
+        {
+            Cell& c = m_cells[i];
+            if (!c.solved() && c.possible(value))
+            {
+                ++numCellsWherePossible;
+                indexPossible = i;
+            }
+        }
+        if (numCellsWherePossible == 1)
+        {
+            setValue(indexPossible / m_N, indexPossible % m_N, value);
+            ++changes;
+        }
+    };
+
+    for (const auto& row : m_rows)
+    {
+        for (size_t value = 1; value <= m_N; ++value)
+        {
+            solveBlock(value, row);
+        }
+    }
+    for (const auto& col : m_cols)
+    {
+        for (size_t value = 1; value <= m_N; ++value)
+        {
+            solveBlock(value, col);
         }
     }
 
