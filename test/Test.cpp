@@ -58,7 +58,7 @@ bool TestSolver::DoCompute()
         if (openInputData("eval/solver/SudokuSolver_9_1.yml", "field", *in))
         {
             Sudoku s(9);
-            s.setLogLevel(6);
+            s.setLogLevel(4);
             m_context.initTask(s);
 
             auto ci(std::make_shared<Container>()), co(std::make_shared<Container>());

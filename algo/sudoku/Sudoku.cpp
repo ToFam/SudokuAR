@@ -3,6 +3,7 @@
 #include <cmath>
 #include <assert.h>
 #include <iostream>
+#include <thread>
 #include <vector>
 #include <numeric>
 
@@ -298,7 +299,7 @@ bool Sudoku::solveStep(Field& f, int recursionDepth, Field& outResult)
             ++steps;
         } while (valid && singleStepSolved > 0);
 
-        if (m_logLevel > 0)
+        if (m_logLevel > recursionDepth)
         {
             for (int tab = 0; tab < recursionDepth; tab++)
             {
@@ -306,10 +307,8 @@ bool Sudoku::solveStep(Field& f, int recursionDepth, Field& outResult)
             }
 
             std::cout << steps << " forced step(s) solved " << acc << " cells" << std::endl;
-        }
-
-        if (m_logLevel > 1)
             f.print(recursionDepth);
+        }
 
         if (f.solved())
         {
@@ -321,9 +320,15 @@ bool Sudoku::solveStep(Field& f, int recursionDepth, Field& outResult)
             return false;
 
         size_t row, col; int val;
-        m_logLevel--;
-        bool success = solveTrial(f, row, col, val, recursionDepth + 1, outResult);
-        m_logLevel++;
+        bool success;
+        if (recursionDepth == 3 || recursionDepth == 4)
+        {
+            success = solveTrialSplit(f, row, col, val, recursionDepth + 1, outResult);
+        }
+        else
+        {
+            success = solveTrial(f, row, col, val, recursionDepth + 1, outResult);
+        }
 
         return success;
     }
@@ -434,8 +439,8 @@ bool Sudoku::solveTrial(Field &f, size_t &outRow, size_t &outCol, int &outValue,
 {
     for (size_t i = 0; i < m_N * m_N; i++)
     {
-        outRow = i / 9;
-        outCol = i % 9;
+        outRow = i / m_N;
+        outCol = i % m_N;
         if (f.value(outRow, outCol) == 0)
         {
             for (size_t p = 1; p <= m_N; ++p)
@@ -444,7 +449,7 @@ bool Sudoku::solveTrial(Field &f, size_t &outRow, size_t &outCol, int &outValue,
                 {
                     outValue = p;
 
-                    if (m_logLevel > -1)
+                    if (m_logLevel >= recursionDepth)
                     {
                         for (int tab = 0; tab < recursionDepth - 1; tab++)
                         {
@@ -457,14 +462,82 @@ bool Sudoku::solveTrial(Field &f, size_t &outRow, size_t &outCol, int &outValue,
                     Field f2 = f;
                     f2.setValue(outRow, outCol, outValue);
 
-                    if (m_logLevel > 1)
+                    if (m_logLevel > recursionDepth)
+                    {
                         f2.print(recursionDepth);
+                    }
+
+                    if (m_logLevel > 1)
 
                     if (solveStep(f2, recursionDepth, outResult))
                     {
                         return true;
                     }
                 }
+            }
+
+            return false;
+        }
+    }
+
+    assert(false);
+    return f.solved();
+}
+
+bool Sudoku::solveTrialSplit(Field &f, size_t &outRow, size_t &outCol, int &outValue, int recursionDepth, Field& outResult)
+{
+    for (size_t i = 0; i < m_N * m_N; i++)
+    {
+        size_t row = i / m_N;
+        size_t col = i % m_N;
+        if (f.value(row, col) == 0)
+        {
+            std::vector<Field> solves(m_N, Field(m_N));
+            std::vector<std::thread> runners;
+            for (size_t p = 1; p <= m_N; ++p)
+            {
+                if (f.possible(row, col, p) == true)
+                {
+                    if (m_logLevel >= recursionDepth)
+                    {
+                        for (int tab = 0; tab < recursionDepth - 1; tab++)
+                        {
+                            std::cout << " | ";
+                        }
+
+                        std::cout << "trial solve: (" << col << "|" << row << ") = " << p << std::endl;
+                    }
+
+                    runners.push_back(std::thread([=, &solves]{
+                        Field f2 = f;
+                        f2.setValue(row, col, p);
+
+                        if (solveStep(f2, recursionDepth, solves[p-1]))
+                        {
+                            m_solved = true;
+                        }
+                    }));
+                }
+            }
+
+            for (auto& r : runners)
+            {
+                r.join();
+            }
+
+            m_solved = false;
+
+            outValue = 1;
+            for (auto& s : solves)
+            {
+                if (s.solved())
+                {
+                    outRow = row;
+                    outCol = col;
+                    outResult = s;
+                    return true;
+                }
+                ++outValue;
             }
 
             return false;

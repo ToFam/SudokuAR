@@ -3,6 +3,8 @@
 #include "../Algorithm.h"
 class Field;
 
+#include <atomic>
+
 class Sudoku : public Algorithm
 {
 public:
@@ -11,6 +13,7 @@ public:
 
 private:
     bool solveTrial(Field &f, size_t &outRow, size_t &outCol, int &outValue, int recursionDepth, Field& outResult);
+    bool solveTrialSplit(Field &f, size_t &outRow, size_t &outCol, int &outValue, int recursionDepth, Field& outResult);
     bool solveStep(Field& f, int recursionDepth, Field& outResult);
 
     void print(int* field, int recursionDepth);
@@ -48,6 +51,8 @@ private:
 
     cl_program m_Program;
     cl_kernel  m_SolverKernel;
+
+    std::atomic<bool> m_solved = false;
 
     int m_logLevel;
 };
