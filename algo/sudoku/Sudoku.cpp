@@ -633,9 +633,18 @@ Field::Field(size_t N) : m_N(N), m_rows(m_N), m_cols(m_N), m_blocks(m_N)
         }
     }
 
+    size_t r = sqrt(m_N);
     for (size_t block = 0; block < m_N; ++block)
     {
-        // todo
+        size_t brow = block / r;
+        size_t bcol = block % r;
+        for (size_t row = r * brow; row < r * (brow + 1); ++row)
+        {
+            for (size_t col = r * bcol; col < r * (bcol + 1); ++col)
+            {
+                m_blocks[block].push_back(m_N * row + col);
+            }
+        }
     }
 }
 
@@ -736,6 +745,13 @@ std::tuple<bool, int> Field::solveStep()
         for (size_t value = 1; value <= m_N; ++value)
         {
             solveBlock(value, col);
+        }
+    }
+    for (const auto& block : m_blocks)
+    {
+        for (size_t value = 1; value <= m_N; ++value)
+        {
+            solveBlock(value, block);
         }
     }
 
