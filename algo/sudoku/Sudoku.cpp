@@ -78,7 +78,14 @@ public:
     bool solved() const;
     size_t numSolvedCells() const;
 
+    /**
+     * @return how many cells currently solved with \a value
+     */
     size_t valueCount(int value) const;
+    /**
+     * @return number with the most already solved cells but not completely solved
+     */
+    size_t mostlySolved() const;
 
 private:
     Cell& cell(size_t row, size_t col) const;
@@ -422,51 +429,47 @@ bool Sudoku::solveStep(Field& f, int recursionDepth, Field& outResult)
 
 bool Sudoku::solveTrial(Field &f, size_t &outRow, size_t &outCol, int &outValue, int recursionDepth, Field& outResult)
 {
-    for (size_t p = 1; p <= m_N; ++p)
+    size_t p = f.mostlySolved();
+
+    if (p == 0) // solved
     {
-        if (f.valueCount(p) == m_N)
-        {
-            continue;
-        }
-
-        for (size_t i = 0; i < m_N * m_N; i++)
-        {
-            outRow = i / m_N;
-            outCol = i % m_N;
-            if (f.possible(outRow, outCol, p))
-            {
-                outValue = p;
-
-                if (m_logLevel >= recursionDepth)
-                {
-                    printIndent(recursionDepth);
-                    std::cout << std::format("trial solve: ({}|{}) = {}", outCol, outRow, outValue) << std::endl;
-                }
-
-                Field f2 = f;
-                f2.setValue(outRow, outCol, outValue);
-
-                if (m_logLevel > recursionDepth)
-                {
-                    f2.print(recursionDepth);
-                }
-
-                if (solveStep(f2, recursionDepth, outResult))
-                {
-                    return true;
-                }
-            }
-        }
-
-        if (m_logLevel >= recursionDepth)
-        {
-            printIndent(recursionDepth);
-            std::cout << std::format("Trial solve for {} failed", p) << std::endl;
-        }
-        return false;
+        return true;
     }
 
-    assert(false);
+    for (size_t i = 0; i < m_N * m_N; i++)
+    {
+        outRow = i / m_N;
+        outCol = i % m_N;
+        if (f.possible(outRow, outCol, p))
+        {
+            outValue = p;
+
+            if (m_logLevel >= recursionDepth)
+            {
+                printIndent(recursionDepth);
+                std::cout << std::format("trial solve: ({}|{}) = {}", outCol, outRow, outValue) << std::endl;
+            }
+
+            Field f2 = f;
+            f2.setValue(outRow, outCol, outValue);
+
+            if (m_logLevel > recursionDepth)
+            {
+                f2.print(recursionDepth);
+            }
+
+            if (solveStep(f2, recursionDepth, outResult))
+            {
+                return true;
+            }
+        }
+    }
+
+    if (m_logLevel >= recursionDepth)
+    {
+        printIndent(recursionDepth);
+        std::cout << std::format("Trial solve for {} failed", p) << std::endl;
+    }
     return false;
 }
 
@@ -778,6 +781,21 @@ size_t Field::valueCount(int value) const
 {
     return std::accumulate(m_cells.begin(), m_cells.end(),
                            0, [value](size_t count, const Cell& cell){ return count + (cell.value() == value ? 1 : 0); });
+}
+
+size_t Field::mostlySolved() const
+{
+    std::map<size_t, int, std::greater<size_t>> solveCountPerValueDesc;
+    for (size_t p = 1; p <= m_N; ++p)
+    {
+        size_t count = valueCount(p);
+        if (count < m_N)
+        {
+            solveCountPerValueDesc[count] = p;
+        }
+    }
+
+    return solveCountPerValueDesc.empty() ? 0 : solveCountPerValueDesc.begin()->second;
 }
 
 void printIndent(int recursionDepth)
