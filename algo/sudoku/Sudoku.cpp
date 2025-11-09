@@ -39,6 +39,8 @@ public:
 
     bool possible(int value) const;
 
+    operator int() const { return value(); }
+
     /**
      * @brief solve write value if only one possibility left
      * @return true if value was set or marked as invalid, false if more than one possibility remains
@@ -76,6 +78,8 @@ public:
     bool solved() const;
     size_t numSolvedCells() const;
 
+    size_t valueCount(int value) const;
+
 private:
     Cell& cell(size_t row, size_t col) const;
 
@@ -88,6 +92,7 @@ private:
     std::vector<std::vector<int>> m_blocks;
 };
 
+void printIndent(int recursionDepth);
 
 Sudoku::Sudoku(size_t N) : Algorithm("Sudoku"), m_N(N),
     m_dArray(nullptr), m_Program(nullptr), m_SolverKernel(nullptr), m_logLevel(1)
@@ -301,11 +306,7 @@ bool Sudoku::solveStep(Field& f, int recursionDepth, Field& outResult)
 
         if (m_logLevel > recursionDepth)
         {
-            for (int tab = 0; tab < recursionDepth; tab++)
-            {
-                std::cout << " | ";
-            }
-
+            printIndent(recursionDepth);
             std::cout << steps << " forced step(s) solved " << acc << " cells" << std::endl;
             f.print(recursionDepth);
         }
@@ -321,14 +322,7 @@ bool Sudoku::solveStep(Field& f, int recursionDepth, Field& outResult)
 
         size_t row, col; int val;
         bool success;
-        if (recursionDepth == 3 || recursionDepth == 4)
-        {
-            success = solveTrialSplit(f, row, col, val, recursionDepth + 1, outResult);
-        }
-        else
-        {
-            success = solveTrial(f, row, col, val, recursionDepth + 1, outResult);
-        }
+        success = solveTrial(f, row, col, val, recursionDepth + 1, outResult);
 
         return success;
     }
@@ -398,18 +392,12 @@ bool Sudoku::solveStep(Field& f, int recursionDepth, Field& outResult)
             }
         }
 
-        if (m_logLevel > 0)
+        if (m_logLevel > recursionDepth)
         {
-            for (int tab = 0; tab < recursionDepth; tab++)
-            {
-                std::cout << " | ";
-            }
-
+            printIndent(recursionDepth);
             std::cout << "single step solve: " << m_hResultGPUFlags[2] << std::endl;
-        }
-
-        if (m_logLevel > 1)
             print(m_hResultGPU.data(), recursionDepth);
+        }
 
         if (m_hResultGPUFlags[0] == 0) // solved
         {
@@ -423,10 +411,7 @@ bool Sudoku::solveStep(Field& f, int recursionDepth, Field& outResult)
         }
 
         size_t row, col; int val;
-        m_logLevel--;
         bool success = solveTrial(f, row, col, val, recursionDepth + 1, outResult);
-        m_logLevel++;
-
         return success;
     }
     else
@@ -437,51 +422,52 @@ bool Sudoku::solveStep(Field& f, int recursionDepth, Field& outResult)
 
 bool Sudoku::solveTrial(Field &f, size_t &outRow, size_t &outCol, int &outValue, int recursionDepth, Field& outResult)
 {
-    for (size_t i = 0; i < m_N * m_N; i++)
+    for (size_t p = 1; p <= m_N; ++p)
     {
-        outRow = i / m_N;
-        outCol = i % m_N;
-        if (f.value(outRow, outCol) == 0)
+        if (f.valueCount(p) == m_N)
         {
-            for (size_t p = 1; p <= m_N; ++p)
+            continue;
+        }
+
+        for (size_t i = 0; i < m_N * m_N; i++)
+        {
+            outRow = i / m_N;
+            outCol = i % m_N;
+            if (f.possible(outRow, outCol, p))
             {
-                if (f.possible(outRow, outCol, p) == true)
+                outValue = p;
+
+                if (m_logLevel >= recursionDepth)
                 {
-                    outValue = p;
+                    printIndent(recursionDepth);
+                    std::cout << std::format("trial solve: ({}|{}) = {}", outCol, outRow, outValue) << std::endl;
+                }
 
-                    if (m_logLevel >= recursionDepth)
-                    {
-                        for (int tab = 0; tab < recursionDepth - 1; tab++)
-                        {
-                            std::cout << " | ";
-                        }
+                Field f2 = f;
+                f2.setValue(outRow, outCol, outValue);
 
-                        std::cout << "trial solve: (" << outCol << "|" << outRow << ") = " << outValue << std::endl;
-                    }
+                if (m_logLevel > recursionDepth)
+                {
+                    f2.print(recursionDepth);
+                }
 
-                    Field f2 = f;
-                    f2.setValue(outRow, outCol, outValue);
-
-                    if (m_logLevel > recursionDepth)
-                    {
-                        f2.print(recursionDepth);
-                    }
-
-                    if (m_logLevel > 1)
-
-                    if (solveStep(f2, recursionDepth, outResult))
-                    {
-                        return true;
-                    }
+                if (solveStep(f2, recursionDepth, outResult))
+                {
+                    return true;
                 }
             }
-
-            return false;
         }
+
+        if (m_logLevel >= recursionDepth)
+        {
+            printIndent(recursionDepth);
+            std::cout << std::format("Trial solve for {} failed", p) << std::endl;
+        }
+        return false;
     }
 
     assert(false);
-    return f.solved();
+    return false;
 }
 
 bool Sudoku::solveTrialSplit(Field &f, size_t &outRow, size_t &outCol, int &outValue, int recursionDepth, Field& outResult)
@@ -508,7 +494,7 @@ bool Sudoku::solveTrialSplit(Field &f, size_t &outRow, size_t &outCol, int &outV
                         std::cout << "trial solve: (" << col << "|" << row << ") = " << p << std::endl;
                     }
 
-                    runners.push_back(std::thread([=, &solves]{
+                    runners.push_back(std::thread([=, this, &solves]{
                         Field f2 = f;
                         f2.setValue(row, col, p);
 
@@ -772,17 +758,28 @@ size_t Field::numSolvedCells() const
                            0, [](size_t filled, const Cell& cell){ return filled + (cell.solved() ? 1 : 0); });
 }
 
-void Field::print(int recursionDepth) const
+size_t Field::valueCount(int value) const
 {
-    size_t r = sqrt(m_N);
-    for (size_t i = 0; i < m_N + r + 1; i++)
-    {
-        for (int tab = 0; tab < recursionDepth; tab++)
-        {
-            std::cout << " | ";
-        }
+    return std::accumulate(m_cells.begin(), m_cells.end(),
+                           0, [value](size_t count, const Cell& cell){ return count + (cell.value() == value ? 1 : 0); });
+}
 
-        for (size_t j = 0; j < m_N + r + 1; j++)
+void printIndent(int recursionDepth)
+{
+    for (int tab = 0; tab < recursionDepth; tab++)
+    {
+        std::cout << " | ";
+    }
+}
+
+template<typename F>
+void print(int N, F &field, int recursionDepth)
+{
+    size_t r = sqrt(N);
+    for (size_t i = 0; i < N + r + 1; i++)
+    {
+        printIndent(recursionDepth);
+        for (size_t j = 0; j < N + r + 1; j++)
         {
             if (i % (r + 1) == 0)
                 std::cout << "--";
@@ -795,7 +792,7 @@ void Field::print(int recursionDepth) const
                     size_t row = i - (i / (r + 1) + 1);
                     size_t col = j - (j / (r + 1) + 1);
 
-                    int value = m_cells[m_N * row + col].value();
+                    int value = field[N * row + col];
                     if (value == 0)
                         std::cout << " ";
                     else
@@ -810,40 +807,12 @@ void Field::print(int recursionDepth) const
     }
 }
 
+void Field::print(int recursionDepth) const
+{
+    ::print(m_N, m_cells, recursionDepth);
+}
+
 void Sudoku::print(int *field, int recursionDepth)
 {
-    size_t r = sqrt(m_N);
-    for (size_t i = 0; i < m_N + r + 1; i++)
-    {
-        for (int tab = 0; tab < recursionDepth; tab++)
-        {
-            std::cout << " | ";
-        }
-
-        for (size_t j = 0; j < m_N + r + 1; j++)
-        {
-            if (i % (r + 1) == 0)
-                std::cout << "--";
-            else
-            {
-                if (j % (r + 1) == 0)
-                    std::cout << "|";
-                else
-                {
-                    size_t row = i - (i / (r + 1) + 1);
-                    size_t col = j - (j / (r + 1) + 1);
-
-                    int value = field[m_N * row + col];
-                    if (value == 0)
-                        std::cout << " ";
-                    else
-                        std::cout << value;
-                }
-
-                std::cout << " ";
-            }
-        }
-
-        std::cout << std::endl;
-    }
+    ::print(m_N, field, recursionDepth);
 }
