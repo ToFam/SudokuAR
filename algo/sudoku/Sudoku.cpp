@@ -39,6 +39,8 @@ public:
 
     bool possible(int value) const;
 
+    size_t possibilities() const;
+
     operator int() const { return value(); }
 
     /**
@@ -85,7 +87,15 @@ public:
     /**
      * @return number with the most already solved cells but not completely solved
      */
-    size_t mostlySolved() const;
+    size_t mostlySolvedNumber() const;
+
+    /**
+     * @brief mostSolvedCell finds yet unsolved cell with fewest remaining possiblities
+     * @param outRow row coord of cell
+     * @param outCol col coord of cell
+     * @return how many remaining possibilties
+     */
+    size_t mostSolvedCell(size_t& outRow, size_t& outCol) const;
 
 private:
     Cell& cell(size_t row, size_t col) const;
@@ -429,17 +439,10 @@ bool Sudoku::solveStep(Field& f, int recursionDepth, Field& outResult)
 
 bool Sudoku::solveTrial(Field &f, size_t &outRow, size_t &outCol, int &outValue, int recursionDepth, Field& outResult)
 {
-    size_t p = f.mostlySolved();
+    f.mostSolvedCell(outRow, outCol);
 
-    if (p == 0) // solved
+    for (size_t p = 1; p <= m_N; ++p)
     {
-        return true;
-    }
-
-    for (size_t i = 0; i < m_N * m_N; i++)
-    {
-        outRow = i / m_N;
-        outCol = i % m_N;
         if (f.possible(outRow, outCol, p))
         {
             outValue = p;
@@ -468,7 +471,7 @@ bool Sudoku::solveTrial(Field &f, size_t &outRow, size_t &outCol, int &outValue,
     if (m_logLevel >= recursionDepth)
     {
         printIndent(recursionDepth);
-        std::cout << std::format("Trial solve for {} failed", p) << std::endl;
+        std::cout << std::format("Trial solve for ({}|{}) failed", outCol, outRow) << std::endl;
     }
     return false;
 }
@@ -558,6 +561,11 @@ bool Cell::possible(int value) const
     }
 
     return m_possible[value - 1];
+}
+
+size_t Cell::possibilities() const
+{
+    return std::count(m_possible.begin(), m_possible.end(), true);
 }
 
 bool Cell::setValue(int value)
@@ -783,7 +791,7 @@ size_t Field::valueCount(int value) const
                            0, [value](size_t count, const Cell& cell){ return count + (cell.value() == value ? 1 : 0); });
 }
 
-size_t Field::mostlySolved() const
+size_t Field::mostlySolvedNumber() const
 {
     std::map<size_t, int, std::greater<size_t>> solveCountPerValueDesc;
     for (size_t p = 1; p <= m_N; ++p)
@@ -796,6 +804,24 @@ size_t Field::mostlySolved() const
     }
 
     return solveCountPerValueDesc.empty() ? 0 : solveCountPerValueDesc.begin()->second;
+}
+
+size_t Field::mostSolvedCell(size_t& outRow, size_t& outCol) const
+{
+    size_t minIndex = 0, value = m_N;
+    for (size_t i = 0; i < m_cells.size(); ++i)
+    {
+        auto p = m_cells[i].possibilities();
+        if (p > 0 && p < value)
+        {
+            value = p;
+            minIndex = i;
+        }
+    }
+
+    outRow = minIndex / m_N;
+    outCol = minIndex % m_N;
+    return value;
 }
 
 void printIndent(int recursionDepth)
